@@ -1,0 +1,500 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+### MSc Land and Ecological Restoration - Research Project
+# Comparison of LOI and NPOC by collection week
+## For Shimadzu, data only available for weeks 1 and 3
+## Wetlands split into BuriedWetlands (including RiverBed) located underneath grey clays
+## and Wetlands for contemporary overlying wetland soils and associated grey clay
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+## Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+```
+
+## Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+Shimadzu<-read_excel(filepath,
+                       sheet = "SoildataV3",
+                       range = "A1:AE155")
+```
+
+## Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Wetland", "BuriedWetland")
+PaleoHorizonOrder<-c("Floodplain1", "Gley", "Wetland", "BuriedWetland")
+FldPlnHorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "BuriedWetland")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+
+```{r}
+Shimadzu_clean<-Shimadzu %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "Gley" | horizon_type == "Wetland" | horizon_type == "BuriedWetland") %>% 
+  select(-fresh_weight) %>%
+  drop_na()
+```
+
+# Analysis with respect to Week of sample collection
+
+## Plot the NPOC and LOI data by week
+
+```{r}
+Shimadzu_clean%>%
+  ggplot(aes(x=Week, y=npoc, ymin = 0)) +
+  geom_boxplot()+
+ geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+    labs(x = "Week of collection",
+       y = "NPOC",
+       title = "Variation of NPOC with sample collection week") +
+  theme_cowplot() 
+```
+
+```{r}
+Shimadzu_clean%>%
+  ggplot(aes(x=Week, y=loi_calc, ymin = 0)) +
+  geom_boxplot()+
+ geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+    labs(x = "Week of collection",
+       y = "LOI",
+       title = "Variation of LOI with sample collection week") +
+  theme_cowplot() 
+```
+
+# extracting the two week's data
+
+```{r}
+NPOCLOIWeek1<-Shimadzu_clean %>%
+  filter(Week=="Week1")
+
+NPOCLOIWeek3<-Shimadzu_clean %>%
+  filter(Week=="Week3")
+```
+
+## Test if soil samples from different weeks are significantly different
+
+```{r}
+npoc1<-NPOCLOIWeek1 %>%
+  select(npoc) %>%
+  pull() 
+loi1<-NPOCLOIWeek1%>%
+  select(loi_calc) %>%
+  pull() 
+t.test(npoc1,loi1)
+```
+
+```{r}
+npoc3<-NPOCLOIWeek3 %>%
+  select(npoc) %>%
+  pull() 
+loi3<-NPOCLOIWeek3%>%
+  select(loi_calc) %>%
+  pull() 
+t.test(npoc3,loi3)
+```
+
+### Anova week 1
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=NPOCLOIWeek1)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+NPOCLOIWeek1 %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+### Anova week 3
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=NPOCLOIWeek3)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+NPOCLOIWeek3 %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+
+```{r}
+NPOCLOIWeek3 %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI", title = "Variation of LOI with Log(NPOC) for weeks 1 and 3") + 
+  geom_point(data=NPOCLOIWeek1, size = 2,alpha=0.5, colour="red") + 
+  geom_point(data=NPOCLOIWeek3, size = 2,alpha=0.5, colour="blue") + 
+  geom_smooth(data=NPOCLOIWeek1,method="lm",se=FALSE, colour ="red")+
+  geom_smooth(data=NPOCLOIWeek3,method="lm",se=FALSE, colour ="blue")+
+  theme_cowplot()
+```
+
+# NPOC and LOI with soil horizon and week
+
+```{r}
+Shimadzu_clean%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymin = 0, colour = Week)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Horizon",
+       y = "NPOC",
+       title = "Variation of NPOC with soil horizon and collection week") +
+  theme_cowplot() +
+  theme(legend.position = c(0.01,0.85), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+```{r}
+Shimadzu_clean%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymin = 0, colour = Week)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Horizon",
+       y = "LOI",
+       title = "Variation of LOI with soil horizon and collection week") +
+  theme_cowplot() +
+  theme(legend.position = c(0.01,0.85), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+# Annovas for Floodplain1, Gley and Buried Wetland soils
+
+## Floodplain 1
+
+### Anova week 1
+
+```{r}
+testdata<-NPOCLOIWeek1 %>%
+  filter(horizon_type=="Floodplain1")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+### Anova week 3
+
+```{r}
+testdata<-NPOCLOIWeek3 %>%
+  filter(horizon_type=="Floodplain1")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+## Gley
+
+### Anova week 1
+
+```{r}
+testdata<-NPOCLOIWeek1 %>%
+  filter(horizon_type=="Gley")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+### Anova week 3
+
+```{r}
+testdata<-NPOCLOIWeek3 %>%
+  filter(horizon_type=="Gley")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+## BuriedWetland
+
+### Anova week 1
+
+```{r}
+testdata<-NPOCLOIWeek1 %>%
+  filter(horizon_type=="BuriedWetland")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+### Anova week 3
+
+```{r}
+testdata<-NPOCLOIWeek3 %>%
+  filter(horizon_type=="BuriedWetland")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+# NPOC and LOI with soil wetness and week
+
+```{r}
+Shimadzu_clean%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=npoc, ymin = 0, colour = Week)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Wetness",
+       y = "NPOC",
+       title = "Variation of NPOC with soil wetness and collection week") +
+  theme_cowplot() 
+```
+
+```{r}
+Shimadzu_clean%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=loi_calc, ymin = 0, colour = Week)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Wetness",
+       y = "LOI",
+       title = "Variation of LOI with soil wetness and collection week") +
+  theme_cowplot() 
+```
+
+# Annovas for Dry, Damp and Wet soils
+
+## Dry
+
+### Anova week 1
+
+```{r}
+testdata<-NPOCLOIWeek1 %>%
+  filter(wetdrydamp=="Dry")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+### Anova week 3
+
+```{r}
+testdata<-NPOCLOIWeek3 %>%
+  filter(wetdrydamp=="Dry")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+## Damp
+
+### Anova week 1
+
+```{r}
+testdata<-NPOCLOIWeek1 %>%
+  filter(wetdrydamp=="Damp")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+### Anova week 3
+
+```{r}
+testdata<-NPOCLOIWeek3 %>%
+  filter(wetdrydamp=="Damp")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+## Wet
+
+### Anova week 1
+
+```{r}
+testdata<-NPOCLOIWeek1 %>%
+  filter(wetdrydamp=="Wet")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+### Anova week 3
+
+```{r}
+testdata<-NPOCLOIWeek3 %>%
+  filter(wetdrydamp=="Wet")
+```
+
+```{r}
+NPOC_LOI_model<-lm(log(npoc)~loi_calc,data=testdata)
+autoplot(NPOC_LOI_model)[1:2] + theme_cowplot()
+anova(NPOC_LOI_model)
+```
+
+```{r}
+testdata %>%
+  ggplot(aes(x = log(npoc), y = loi_calc)) + 
+  labs (x = "Log(NPOC)", y = "LOI") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+
+
+
+
+
+
+
+
+
+
+
+

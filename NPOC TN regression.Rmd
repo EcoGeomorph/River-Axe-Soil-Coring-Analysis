@@ -1,0 +1,101 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+### MSc Land and Ecological Restoration - Research Project
+# Regressoin analysis for NPOC and RTN
+## For Shimadzu, data only available for weeks 1 and 3
+## Wetlands split into BuriedWetlands (including RiverBed) located underneath grey clays
+## and Wetlands for contemporary overlying wetland soils and associated grey clay
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+### Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+```
+
+### Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+Shimadzu<-read_excel(filepath,
+                       sheet = "SoildataV3",
+                       range = "A1:AE155")
+```
+
+### Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Wetland", "BuriedWetland")
+PaleoHorizonOrder<-c("Floodplain1", "Gley", "Wetland", "BuriedWetland")
+FldPlnHorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "BuriedWetland")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+
+```{r}
+Shimadzu_clean<-Shimadzu %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "Gley" | horizon_type == "Wetland" | horizon_type == "BuriedWetland") %>% 
+  select(-fresh_weight) %>%
+  drop_na()
+```
+
+## Summarise the data
+
+```{r}
+Shim_npoc_summary<-Shimadzu_clean %>%
+  group_by(horizon_type) %>%
+  summarise(mean.npoc = mean(npoc),
+            se.npoc = sd(npoc/sqrt(n())))%>%
+  arrange(HorizonOrder)
+Shim_npoc_summary
+
+Shim_tn_summary<-Shimadzu_clean %>%
+  group_by(horizon_type) %>%
+  summarise(mean.tn = mean(tn),
+            se.tn = sd(tn/sqrt(n())))
+Shim_tn_summary
+```
+
+# Regression test for NPOC to TN
+
+```{r}
+NPOC_TN_model<-lm(npoc~tn,data=Shimadzu_clean)
+autoplot(NPOC_TN_model)[1:2] + theme_cowplot()
+```
+```{r}
+anova(NPOC_TN_model)
+```
+
+```{r}
+NPOC_TN_model<-lm(log(npoc)~tn,data=Shimadzu_clean)
+autoplot(NPOC_TN_model)[1:2] + theme_cowplot()
+```
+
+```{r}
+anova(NPOC_TN_model)
+```
+
+
+```{r}
+Shimadzu_clean %>%
+  ggplot(aes(x = tn, y = log(npoc))) + 
+  labs (x = "TN", y = "Log(NPOC)") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()
+```
+

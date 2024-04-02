@@ -1,0 +1,210 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+
+### MSc Land and Ecological Restoration - Research Project
+# Variation of LOI with soil horizon, and by floodplain/paleochannel core location
+### Wetlands split into BuriedWetlands (including RiverBed) located underneath grey clays and Wetlands for contemporary overlying wetland soils and associated grey clay
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+### Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+```
+
+### Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+soil_cores<-read_excel(filepath,
+                       sheet = "SoildataV3",
+                       range = "A1:Z155")
+```
+
+### Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Wetland", "BuriedWetland")
+PaleoHorizonOrder<-c("Floodplain1", "Gley", "Wetland", "Buried Wetland")
+FldPlnHorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Buried Wetland")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+Notice we have some missing values in the loi column, identified by 0 in test_for_loi
+
+```{r}
+soilloi_clean<-soil_cores %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "Gley" | horizon_type == "Wetland" | horizon_type == "BuriedWetland") %>% 
+  select(-loi) %>%
+  drop_na()
+```
+
+## split floodplain and paleochannel data
+```{r}
+paleochannel<-soilloi_clean %>%
+  filter(core_type=="Paleochannel")
+floodplain<-soilloi_clean %>%
+  filter(core_type=="Floodplain")
+```
+
+# Summarise the data
+
+```{r}
+horizon_summary<-soilloi_clean %>%
+  group_by(horizon_type) %>%
+  summarise(mean.Sloi = mean(loi_calc),
+            se.Sloi = sd(loi_calc/sqrt(n())))%>%
+  arrange(HorizonOrder)
+horizon_summary
+```
+```{r}
+PaleoHorizonSummary<-paleochannel%>%
+  group_by(horizon_type) %>%
+  summarise(mean.Sloi = mean(loi_calc),
+            se.Sloi = sd(loi_calc/sqrt(n())))%>%
+  arrange(PaleoHorizonOrder)
+PaleoHorizonSummary
+```
+
+```{r}
+FloodHorizonSummary<-floodplain%>%
+  group_by(horizon_type) %>%
+  summarise(mean.Sloi = mean(loi_calc),
+            se.Sloi = sd(loi_calc/sqrt(n())))%>%
+  arrange(FldPlnHorizonOrder)
+FloodHorizonSummary
+```
+
+
+# Plot the full dataset
+
+```{r}
+soilloi_clean%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymax =0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+  labs(x = "Soil Horizon",
+       y = "Total Carbon LOI",
+       title = "Variation of LOI by soil horizon") +
+  theme_cowplot() 
+```
+
+## Test if soil horizon data sets are significantly different
+
+```{r}
+Fdpn1Loi<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>% 
+  select(loi_calc) %>%
+  pull() 
+
+Fdpn2Loi<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain2") %>% 
+  select(loi_calc) %>%
+  pull() 
+
+GleyLoi<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  select(loi_calc) %>%
+  pull() 
+
+WetlandLoi<-soilloi_clean %>%
+  filter(horizon_type=="Wetland") %>%
+  select(loi_calc) %>%
+  pull()
+
+BuriedWetLoi<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  select(loi_calc) %>%
+  pull()
+
+t.test(Fdpn1Loi,BuriedWetLoi)
+t.test(Fdpn2Loi,BuriedWetLoi)
+t.test(GleyLoi,BuriedWetLoi)
+t.test(WetlandLoi,BuriedWetLoi)
+
+t.test(Fdpn1Loi,Fdpn2Loi)
+t.test(Fdpn1Loi,GleyLoi)
+t.test(Fdpn1Loi, WetlandLoi)
+
+t.test(GleyLoi, WetlandLoi)
+t.test(GleyLoi, Fdpn2Loi)
+
+t.test(WetlandLoi, Fdpn2Loi)
+
+```
+
+## Plot the LOI data by soil horizon and by core location (Floodplain/Paleochannel)
+
+```{r}
+soilloi_clean%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymax =0.35, ymin = 0, colour = core_type)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+  labs(x = "Soil Horizon",
+       y = "Total Carbon LOI",
+       title = "Variation of LOI with soil horizon and core location",
+       colour = "Core location") +
+  theme_cowplot()+
+  theme(legend.position = c(0.05,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10)) 
+```
+
+
+## Test if floodplain/ paleochannel soil horizon data sets are significantly different
+
+```{r}
+Fdpn1FloodLoi<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>%
+  filter(core_type=="Floodplain") %>%  
+  select(loi_calc) %>%
+  pull() 
+
+Fdpn1PaleoLoi<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>% 
+  filter(core_type=="Paleochannel") %>%  
+  select(loi_calc) %>%
+  pull() 
+
+GleyFloodLoi<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(core_type=="Floodplain") %>%  
+  select(loi_calc) %>%
+  pull() 
+
+GleyPaleoLoi<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(core_type=="Paleochannel") %>%  
+  select(loi_calc) %>%
+  pull() 
+
+BuriedWetFloodLoi<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(core_type=="Floodplain") %>%  
+  select(loi_calc) %>%
+  pull()
+
+BuriedWetPaleoLoi<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(core_type=="Paleochannel") %>%  
+  select(loi_calc) %>%
+  pull()
+
+t.test(Fdpn1FloodLoi, Fdpn1PaleoLoi)
+t.test(GleyFloodLoi, GleyPaleoLoi)
+t.test(BuriedWetFloodLoi, BuriedWetPaleoLoi)
+
+```
+

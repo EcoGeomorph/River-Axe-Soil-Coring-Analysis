@@ -1,0 +1,634 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+### MSc Land and Ecological Restoration - Research Project
+# Variation of LOI with soil depth below the surface
+### Wetlands split into BuriedWetlands (including RiverBed) located underneath grey clays and Wetlands for contemporary overlying wetland soils and associated grey clay
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+### Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+library(lme4)
+library(lmerTest)
+```
+
+### Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+soil_cores<-read_excel(filepath,
+                       sheet = "SoildataV3",
+                       range = "A1:AB155")
+```
+
+### Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Wetland", "BuriedWetland")
+PaleoHorizonOrder<-c("Floodplain1", "Gley", "Wetland", "Buried Wetland")
+FldPlnHorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Buried Wetland")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+
+```{r}
+soilloi_clean<-soil_cores %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "Gley" | horizon_type == "Wetland" | horizon_type == "BuriedWetland") %>%  
+  select(-loi) %>%
+  drop_na()
+```
+
+## Anlaysis uses depth below core location's surface (depth_cm)
+
+# Graphical representation of the data by Horizon type and by wetness 
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc, colour = reorder(horizon_type,Horizon_order))) +
+  geom_point(aes(size=wetdrydamp), alpha=0.5)+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+  #     title = "Variation of LOI with Depth for the Axe Valley",
+          size = "Soil wetness",
+       colour = "Soil horizon") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(legend.position = c(0.02,0.7), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(title = element_text(size=11.5))
+```
+
+## considering buried Wetland soils in detail
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc)) +
+  geom_point(aes(size=core_type, colour = factor( wetdrydamp, ordered(WetnessOrder))), alpha=0.5)+
+  geom_smooth(method = "lm", se=FALSE)+
+  labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Buried Wetland soil LOI with Depth for the Axe Valley",
+       size = "Core location",
+       colour = "Soil wetness") +
+  xlim(0,330)+
+  theme_cowplot() +
+  theme(legend.position = c(0.02,0.75), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(title = element_text(size=11.5))
+```
+
+# For all buried wetland soils
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+WetlandDepthmodel<-lm(loi_calc~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc, colour = core_type )) +
+  geom_point(aes(size=factor( wetdrydamp, ordered(WetnessOrder))), alpha=0.5)+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Buried Wetland soil LOI with Depth for the Axe Valley",
+       size = "Soil wetness",
+       colour = "Core location") +
+  geom_smooth(method = "lm", se=FALSE)+
+  xlim(0,330)+
+  theme_cowplot() +
+  theme(legend.position = c(0.02,0.75), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(title = element_text(size=11.5))
+```
+
+# For Floodplain wetland soils
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  filter(core_type=="Floodplain")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+WetlandDepthmodel<-lm(loi_calc~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+# For Paleochannel BuriedWetland soils
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  filter(core_type=="Paleochannel")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+WetlandDepthmodel<-lm(loi_calc~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc, colour = factor( wetdrydamp, ordered(WetnessOrder)) )) +
+  geom_point(aes(size=core_type), alpha=0.5)+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Buried Wetland soil LOI with Depth for the Axe Valley",
+       colour = "Soil wetness",
+       size = "Core location") +
+  geom_smooth(method = "lm", se=FALSE)+
+  xlim(0,330)+
+  theme_cowplot() +
+  theme(legend.position = c(0.02,0.75), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(title = element_text(size=11.5))
+```
+
+# For wet/dry/damp buried wetland soils
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  filter(wetdrydamp=="Dry")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  filter(wetdrydamp=="Damp")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  filter(wetdrydamp=="Wet")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  ggplot(aes(x=core_type, y=loi_calc)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+#  geom_point(position = position_jitterdodge())+
+    labs(x = "Core location",
+       y = "Carbon LOI",
+       title = "Variation of Buried Wetland soils LOI with core location") +
+  theme_cowplot() +
+  theme(title = element_text(size=11.5))
+```
+
+## considering Gley soils in detail
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc)) +
+  geom_point(aes(size=core_type, colour = factor( wetdrydamp, ordered(WetnessOrder))), alpha=0.5)+
+  geom_smooth(method = "lm", se=FALSE)+
+  labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Gley soil LOI with Depth for the Axe Valley",
+       size = "Core location",
+       colour = "Soil wetness") +
+  xlim(0,330)+
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.75), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(title = element_text(size=11.5))
+```
+
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")
+```
+
+# log relation
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+# linear relation
+
+```{r}
+WetlandDepthmodel<-lm(loi_calc~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+#plots of gley soils against wetness and location - line plots/point size for each
+
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc, colour = factor( wetdrydamp, ordered(WetnessOrder)))) +
+  geom_point(aes(size=core_type), alpha=0.5)+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Gley soil LOI with Depth for the Axe Valley",
+       size = "Core location",
+       colour = "Soil wetness") +
+  geom_smooth(method = "lm", se=FALSE)+
+  xlim(0,330)+
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.75), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(title = element_text(size=11.5))
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc, colour = core_type )) +
+  geom_point(aes(size=factor( wetdrydamp, ordered(WetnessOrder))), alpha=0.5)+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Gley soil LOI with Depth for the Axe Valley",
+       size = "Soil wetness",
+       colour = "Core location") +
+  geom_smooth(method = "lm", se=FALSE)+
+  xlim(0,330)+
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.75), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(title = element_text(size=11.5))
+```
+
+# For Floodplain gley soils
+
+```{r}
+GleyDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  filter(core_type=="Floodplain")
+```
+
+# log relation
+
+```{r}
+GleyDepthmodel<-lm(log(loi_calc)~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+
+# linear relation
+
+```{r}
+GleyDepthmodel<-lm(loi_calc~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+
+# For Paleochannel Gley soils
+
+```{r}
+GleyDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  filter(core_type=="Paleochannel")
+```
+
+# log relation
+
+```{r}
+GleyDepthmodel<-lm(log(loi_calc)~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+# liner relation
+
+```{r}
+GleyDepthmodel<-lm(loi_calc~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+
+# For dry/damp/wet gley soils
+
+```{r}
+GleyDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  filter(wetdrydamp=="Dry")
+```
+
+# log relation
+
+```{r}
+GleyDepthmodel<-lm(log(loi_calc)~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+
+# linear relation
+
+```{r}
+GleyDepthmodel<-lm(loi_calc~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+
+```{r}
+GleyDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  filter(wetdrydamp=="Damp")
+```
+
+# log relation
+
+```{r}
+GleyDepthmodel<-lm(log(loi_calc)~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+
+# linear relation
+
+```{r}
+GleyDepthmodel<-lm(loi_calc~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+
+```{r}
+GleyDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  filter(wetdrydamp=="Wet")
+```
+
+# log relation
+
+```{r}
+GleyDepthmodel<-lm(log(loi_calc)~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+
+# linear relation
+
+```{r}
+GleyDepthmodel<-lm(loi_calc~depth_cm,data=GleyDepth)
+autoplot(GleyDepthmodel)[1:2] + theme_cowplot()
+anova(GleyDepthmodel)
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  ggplot(aes(x=core_type, y=loi_calc)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+#  geom_point(position = position_jitterdodge())+
+    labs(x = "Core location",
+       y = "Carbon LOI",
+       title = "Variation of Gley LOI with core location") +
+  theme_cowplot() 
+```
+
+## considering Wetland soils in detail
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Wetland")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc)) +
+  geom_point(aes(size=wetdrydamp), alpha=0.5, colour="Purple")+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Wetland soil LOI with Depth for the Axe Valley",
+          size = "Soil wetness") +
+  geom_smooth(method = "lm", se=FALSE)+
+  xlim(0,330)+
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.9), legend.title = element_text(size =11), legend.text = element_text(size=9))+
+  theme(title = element_text(size=11.5))
+```
+
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Wetland")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+WetlandDepthmodel<-lm(loi_calc~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+## considering Floodplain2 soils in detail
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Floodplain2")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc)) +
+  geom_point(aes(size=wetdrydamp), alpha=0.5, colour="Purple")+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Floodplain2 soil LOI with Depth for the Axe Valley",
+          size = "Soil wetness") +
+  geom_smooth(method = "lm", se=FALSE)+
+  xlim(0,330)+
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.9), legend.title = element_text(size =11), legend.text = element_text(size=9))+
+  theme(title = element_text(size=11.5))
+```
+
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Floodplain2")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+WetlandDepthmodel<-lm(loi_calc~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+## considering wetness of soils in detail
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc, colour = factor( wetdrydamp, ordered(WetnessOrder)))) +
+  geom_point(aes(size=core_type), alpha=0.5)+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of LOI with soil wetness for the Axe Valley",
+          size = "Core location",
+       colour = "Soil Wetness") +
+  geom_smooth(method = "lm", se=FALSE)+
+  xlim(0,330)+
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.75), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(title = element_text(size=11.5))
+```
+
+# for dry soils
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(wetdrydamp=="Dry")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+WetlandDepthmodel<-lm(loi_calc~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+# for damp soils
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(wetdrydamp=="Damp")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+WetlandDepthmodel<-lm(loi_calc~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+# for wet soils
+
+```{r}
+WetlandDepth<-soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(wetdrydamp=="Wet")
+```
+
+```{r}
+WetlandDepthmodel<-lm(log(loi_calc)~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+```{r}
+WetlandDepthmodel<-lm(loi_calc~depth_cm,data=WetlandDepth)
+autoplot(WetlandDepthmodel)[1:2] + theme_cowplot()
+anova(WetlandDepthmodel)
+```
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,367 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+### MSc Land and Ecological Restoration - Research Project
+# Variation of LOI along the Synderford valley, by depth, soil horizon, and wetness
+### Wetlands split into BuriedWetlands (including RiverBed) located underneath grey clays and Wetlands for contemporary overlying wetland soils and associated grey clay
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+## Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+library(lme4)
+library(lmerTest)
+```
+
+## Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+soil_cores<-read_excel(filepath,
+                       sheet = "SoildataV3",
+                       range = "A1:AB155")
+```
+
+## Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Wetland", "BuriedWetland")
+PaleoHorizonOrder<-c("Floodplain1", "Gley", "Wetland", "Buried Wetland")
+FldPlnHorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Buried Wetland")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+Notice we have some missing values in the loi column, identified by 0 in test_for_loi
+
+```{r}
+soilloi_clean<-soil_cores %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "Gley" | horizon_type == "Wetland" | horizon_type == "BuriedWetland") %>% 
+  select(-loi) %>%
+  drop_na()
+```
+
+## Plot the data by soil horizon
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=loi_calc, colour = factor( horizon_type, ordered(HorizonOrder)))) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Carbon LOI",
+       title = "Variation of LOI for along the length of the Synderford Valley",
+       colour = "Soil horizon") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=11.5))
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=loi_calc, colour = factor( wetdrydamp, ordered(WetnessOrder)))) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Carbon LOI",
+       title = "Variation of LOI for along the length of the Synderford Valley",
+       colour = "Soil wetness") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=11.5))
+```
+
+
+# Mixed effects for horizon type, soil wetness and distance along the the Synderford Valley are not possible dur to limited sample numbers
+
+# Error: number of observations (=31) <= number of random effects (=32) for term (horizon_type | Distance); the random-effects parameters and the residual variance (or scale parameter) are probably unidentifiable
+
+# Graphical representation of the data by Horizon type and by wetness
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=-depth_cm, colour = factor( horizon_type, ordered(HorizonOrder)))) +
+  geom_point(aes(size=loi_calc), alpha=0.5)+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Depth below surface",
+       title = "Variation of LOI with Depth and distance along the Synderford Valley",
+       size ="Loi",
+       colour = "Soil horizon") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=-depth_cm, colour = factor( wetdrydamp, ordered(WetnessOrder)))) +
+  geom_point(aes(size=loi_calc), alpha=0.5)+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Depth below surface",
+       title = "Variation of LOI with Depth and distance along the Synderford Valley",
+       size ="Loi",
+       colour = "Soil wetness") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))
+```
+
+# Investigation of each 'significant' relationship
+
+# wetness - dry, damp, wet
+
+```{r}
+DepthDist<-soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(wetdrydamp=="Dry")
+```
+
+```{r}
+Distmodel<-lm(log(loi_calc)~Distance,data=DepthDist)
+autoplot(Distmodel)[1:2] + theme_cowplot()
+anova(Distmodel)
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(wetdrydamp=="Dry")%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=loi_calc )) +
+  geom_point(size = 3, alpha=0.5, colour = "Red")+
+    labs(x = "Distance along the Axe valley (m from downstream)",
+       y = "Carbon LOI",
+       title = "Variation of dry soils' LOI with distance along the Synderford Valley") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))
+```
+
+
+```{r}
+DepthDist<-soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(wetdrydamp=="Damp")
+```
+
+```{r}
+Distmodel<-lm(log(loi_calc)~Distance,data=DepthDist)
+autoplot(Distmodel)[1:2] + theme_cowplot()
+anova(Distmodel)
+```
+
+```{r}
+soilloi_clean%>%
+  filter(wetdrydamp=="Damp")%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=loi_calc )) +
+  geom_point(size = 3, alpha=0.5, colour = "Green")+
+    labs(x = "Distance along the Axe valley (m from downstream)",
+       y = "Carbon LOI",
+       title = "Variation of damp soils' LOI with distance along the Synderford Valley") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))
+```
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(wetdrydamp=="Wet")%>%
+  ggplot(aes(x=Distance, y=-depth_cm, colour = factor( horizon_type, ordered(HorizonOrder)))) +
+  geom_point(aes(size=loi_calc), alpha=0.5)+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Depth below surface",
+       title = "Variation of wet soil's LOI with Depth and distance along the Synderford Valley",
+       size ="Loi",
+       colour = "Soil horizon") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))
+```
+
+```{r}
+DepthDist<-soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(wetdrydamp=="Wet")
+```
+
+```{r}
+Distmodel<-lm(log(loi_calc)~Distance,data=DepthDist)
+autoplot(Distmodel)[1:2] + theme_cowplot()
+anova(Distmodel)
+```
+
+# for gley soils
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Gley")%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=loi_calc )) +
+  geom_point(size = 3, alpha=0.5, colour = "Green")+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Carbon LOI",
+       title = "Variation of Gley soils' LOI with distance along the Synderford Valley") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))
+```
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Gley")%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=-depth_cm )) +
+  geom_point(aes(size=loi_calc), alpha=0.5)+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Depth below surface",
+       title = "Variation of Gley soils' LOI with Depth and distance along the Synderford Valley",
+       size ="Loi") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10))
+```
+
+
+```{r}
+DepthDist<-soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(horizon_type=="Gley")
+```
+
+```{r}
+Distmodel<-lm(log(loi_calc)~Distance,data=DepthDist)
+autoplot(Distmodel)[1:2] + theme_cowplot()
+anova(Distmodel)
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Gley")%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=-depth_cm, colour = factor( wetdrydamp, ordered(WetnessOrder)))) +
+  geom_point(aes(size=loi_calc), alpha=0.5)+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Depth below surface",
+       title = "Variation of Gley soils' LOI with Depth and distance along the Synderford Valley",
+       size ="Loi",
+       colour = "Soil wetness") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10))
+```
+
+
+```{r}
+DepthDist<-soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(horizon_type=="Gley")%>%
+  filter(wetdrydamp=="Dry")
+```
+
+```{r}
+Distmodel<-lm(log(loi_calc)~Distance,data=DepthDist)
+autoplot(Distmodel)[1:2] + theme_cowplot()
+anova(Distmodel)
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Wetland")%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=-depth_cm, colour = core_type)) +
+  geom_point(aes(size=loi_calc), alpha=0.5)+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Depth below surface",
+       title = "Variation of Wetland soils' LOI with Depth and distance along the Synderford Valley",
+       size ="Loi",
+       colour = "Soil horizon") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))
+```
+
+```{r}
+DepthDist<-soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(horizon_type=="Wetland")
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  filter(River=="Synderford")%>%
+  ggplot(aes(x=Distance, y=-depth_cm, colour = core_type)) +
+  geom_point(aes(size=loi_calc), alpha=0.5)+
+    labs(x = "Distance along the Synderford valley (m from downstream)",
+       y = "Depth below surface",
+       title = "Variation of Buried Wetland soils' LOI with Depth and distance along the Synderford Valley",
+       size ="Loi",
+       colour = "Soil horizon") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=9))
+```
+
+
+```{r}
+DepthDist<-soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(horizon_type=="BuriedWetland")
+```
+
+```{r}
+Distmodel<-lm(log(loi_calc)~Distance,data=DepthDist)
+autoplot(Distmodel)[1:2] + theme_cowplot()
+anova(Distmodel)
+```
+
+
+```{r}
+DepthDist<-soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  filter(core_type=="Floodplain")
+```
+
+```{r}
+Distmodel<-lm(log(loi_calc)~Distance,data=DepthDist)
+autoplot(Distmodel)[1:2] + theme_cowplot()
+anova(Distmodel)
+```
+
+
+```{r}
+DepthDist<-soilloi_clean%>%
+  filter(River=="Synderford")%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  filter(core_type=="Paleochannel")
+```
+
+```{r}
+Distmodel<-lm(log(loi_calc)~Distance,data=DepthDist)
+autoplot(Distmodel)[1:2] + theme_cowplot()
+anova(Distmodel)
+```
+

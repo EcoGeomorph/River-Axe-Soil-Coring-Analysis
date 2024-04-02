@@ -1,0 +1,296 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+### MSc Land and Ecological Restoration - Research Project
+# Variation of LOI with soil horizon, and by river and soil wetness
+### Wetlands split into BuriedWetlands (including RiverBed) located underneath grey clays and Wetlands for contemporary overlying wetland soils and associated grey clay
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+### Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+library(lme4)
+library(lmerTest)
+```
+
+### Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+soil_cores<-read_excel(filepath,
+                       sheet = "SoildataV3",
+                       range = "A1:AB155")
+```
+
+## Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Wetland", "BuriedWetland")
+PaleoHorizonOrder<-c("Floodplain1", "Gley", "Wetland", "Buried Wetland")
+FldPlnHorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Buried Wetland")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+Notice we have some missing values in the loi column, identified by 0 in test_for_loi
+
+```{r}
+soilloi_clean<-soil_cores %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "Gley" | horizon_type == "Wetland" | horizon_type == "BuriedWetland") %>% 
+  select(-loi) %>%
+  drop_na()
+```
+
+## split floodplain and paleochannel data
+```{r}
+paleochannel<-soilloi_clean %>%
+  filter(core_type=="Paleochannel")
+floodplain<-soilloi_clean %>%
+  filter(core_type=="Floodplain")
+```
+
+## Plot the data
+
+```{r}
+soilloi_clean%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymax =0.35, ymin = 0, colour =River)) +
+  geom_boxplot()+
+#  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Horizon",
+       y = "Total Carbon LOI",
+       title = "Variation of LOI by river and soil horizon") +
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+```{r}
+paleochannel%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymax = 0.35, ymin = 0, colour =River)) +
+  geom_boxplot()+
+  #  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Horizon",
+       y = "Total Carbon LOI",
+       title = "Total carbon for Paleochannel core soil samples") +
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10))
+
+```
+
+
+```{r}
+floodplain%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymax = 0.35, ymin = 0, colour =River)) +
+  geom_boxplot()+
+  #  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Horizon",
+       y = "Total Carbon LOI",
+       title = "Total carbon for Floodplain core soil samples") +
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+
+## Test if soil horizon data sets are significantly different for each river
+
+```{r}
+AxeFdpn1Loi<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>% 
+  filter(River=="Axe") %>%
+  select(loi_calc) %>%
+  pull() 
+
+SynFdpn1Loi<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>% 
+  filter(River=="Synderford") %>%
+  select(loi_calc) %>%
+  pull()  
+
+AxeGleyLoi<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(River=="Axe") %>%
+  select(loi_calc) %>%
+  pull() 
+
+SynGleyLoi<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(River=="Synderford") %>%
+  select(loi_calc) %>%
+  pull() 
+
+AxeWetlandLoi<-soilloi_clean %>%
+  filter(horizon_type=="Wetland") %>%
+  filter(River=="Axe") %>%
+  select(loi_calc) %>%
+  pull()
+
+SynWetlandLoi<-soilloi_clean %>%
+  filter(horizon_type=="Wetland") %>%
+  filter(River=="Synderford") %>%
+  select(loi_calc) %>%
+  pull()
+
+AxeBuriedWetlandLoi<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(River=="Axe") %>%
+  select(loi_calc) %>%
+  pull()
+
+SynBuriedWetlandLoi<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(River=="Synderford") %>%
+  select(loi_calc) %>%
+  pull()
+
+t.test(AxeFdpn1Loi,SynFdpn1Loi)
+t.test(AxeGleyLoi,SynGleyLoi)
+t.test(AxeWetlandLoi,SynWetlandLoi)
+t.test(AxeBuriedWetlandLoi, SynBuriedWetlandLoi)
+
+```
+### Consider the influence of soil wetness
+
+## Plot Wetland data
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Wetland")%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=loi_calc, ymax =0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+    labs(x = "Soil wetness",
+       y = "Total Carbon LOI",
+       title = "Total Carbon of Wetland soils by soil wetness") +
+  theme_cowplot() 
+```
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Wetland")%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=loi_calc, ymax =0.35, ymin = 0, colour =River)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil wetness",
+       y = "Carbon LOI",
+       title = "Total Carbon of Wetland soils by soil wetness and river") +
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+## Plot BuriedWetland data
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=loi_calc, ymax =0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+    labs(x = "Soil wetness",
+       y = "Total Carbon LOI",
+       title = "Total Carbon of Buried Wetland soils by soil wetness") +
+  theme_cowplot() 
+```
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=loi_calc, ymax =0.35, ymin = 0, colour =River)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil wetness",
+       y = "Total Carbon LOI",
+       title = "Total Carbon of Buried Wetland soils by soil wetness and river") +
+  theme_cowplot() +
+  theme(legend.position = c(0.05,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+## Test if Buried Wetland soil of different wettness are significantly different
+
+```{r}
+BuriedWetDampLoi<-soilloi_clean %>%
+  filter(wetdrydamp=="Damp") %>% 
+  filter(horizon_type=="BuriedWetland") %>%
+  select(loi_calc) %>%
+  pull() 
+
+BuriedWetDryLoi<-soilloi_clean %>%
+  filter(wetdrydamp=="Dry") %>% 
+  filter(horizon_type=="BuriedWetland") %>%
+  select(loi_calc) %>%
+  pull() 
+
+BuriedWetWetLoi<-soilloi_clean %>%
+  filter(wetdrydamp=="Wet") %>% 
+  filter(horizon_type=="BuriedWetland") %>%
+  select(loi_calc) %>%
+  pull() 
+
+
+t.test(BuriedWetDryLoi,BuriedWetDampLoi)
+t.test(BuriedWetDryLoi,BuriedWetWetLoi)
+t.test(BuriedWetDampLoi,BuriedWetWetLoi)
+
+```
+
+## Test if soil of different wettness are significantly different for each river
+
+
+```{r}
+AxeDampLoi<-soilloi_clean %>%
+  filter(wetdrydamp=="Damp") %>% 
+  filter(River=="Axe") %>%
+  select(loi_calc) %>%
+  pull() 
+
+SynDampLoi<-soilloi_clean %>%
+  filter(wetdrydamp=="Damp") %>% 
+  filter(River=="Synderford") %>%
+  select(loi_calc) %>%
+  pull()  
+
+AxeDryLoi<-soilloi_clean %>%
+  filter(wetdrydamp=="Dry") %>% 
+  filter(River=="Axe") %>%
+  select(loi_calc) %>%
+  pull() 
+
+SynDryLoi<-soilloi_clean %>%
+  filter(wetdrydamp=="Dry") %>% 
+  filter(River=="Synderford") %>%
+  select(loi_calc) %>%
+  pull()  
+
+AxeWetLoi<-soilloi_clean %>%
+  filter(wetdrydamp=="Wet") %>% 
+  filter(River=="Axe") %>%
+  select(loi_calc) %>%
+  pull() 
+
+SynWetLoi<-soilloi_clean %>%
+  filter(wetdrydamp=="Wet") %>% 
+  filter(River=="Synderford") %>%
+  select(loi_calc) %>%
+  pull()  
+
+
+t.test(AxeDryLoi,SynDryLoi)
+t.test(AxeDampLoi,SynDampLoi)
+t.test(AxeWetLoi,SynWetLoi)
+
+
+```

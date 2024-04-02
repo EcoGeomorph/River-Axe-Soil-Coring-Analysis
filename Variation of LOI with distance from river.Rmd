@@ -1,0 +1,312 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+### MSc Land and Ecological Restoration - Research Project
+# Variation of LOI with core distance from the river
+### Wetlands split into BuriedWetlands (including RiverBed) located underneath grey clays and Wetlands for contemporary overlying wetland soils and associated grey clay
+
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+## Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+library(lme4)
+library(lmerTest)
+```
+
+## Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+soil_cores<-read_excel(filepath,
+                       sheet = "SoildataV3",
+                       range = "A1:AB155")
+```
+
+## Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Wetland", "BuriedWetland")
+PaleoHorizonOrder<-c("Floodplain1", "Gley", "Wetland", "Buried Wetland")
+FldPlnHorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Buried Wetland")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+Notice we have some missing values in the loi column, identified by 0 in test_for_loi
+
+```{r}
+soilloi_clean<-soil_cores %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "Gley" | horizon_type == "Wetland" | horizon_type == "BuriedWetland") %>% 
+  select(-loi) %>%
+  drop_na()
+```
+
+## Mixed effects for horizon type, wetness and distance of core from the river
+
+```{r}
+lmSoil<-lmer(loi_calc~horizon_type * wetdrydamp + (horizon_type|DistFromRiver), data=soilloi_clean)
+summary(lmSoil)
+```
+
+```{r}
+  anova(lmSoil)
+```
+
+# For all samples
+
+```{r}
+soilloi_clean%>%
+  ggplot(aes(x=DistFromRiver, y=loi_calc)) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance from the river (m)",
+       y = "Total Carbon LOI",
+       title = "Influence of distance from the river on all soil samples") +
+  geom_smooth(method = "lm", se=FALSE)+
+  ylim(0,27) +
+  xlim(5,66)+
+  theme_cowplot() +
+  theme(title = element_text(size=11.5))
+```
+
+```{r}
+   DistFromRiverModel<-lm(log(loi_calc)~DistFromRiver, data=soilloi_clean)
+   autoplot(DistFromRiverModel)[1:2] + theme_cowplot()
+   anova(DistFromRiverModel)
+```
+
+# for gley soils
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Gley")%>%
+  ggplot(aes(x=DistFromRiver, y=loi_calc)) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance from the river (m)",
+       y = "Total Carbon LOI",
+       title = "Influence of distance from the river on gley soil samples") +
+  geom_smooth(method = "lm", se=FALSE)+
+  ylim(0,27) +
+  xlim(5,66)+
+  theme_cowplot()  +
+  theme(axis.title.y = element_text(hjust=0.05))+
+  theme(title = element_text(size=11.5))
+```
+
+# Linear fit for Gley soils
+
+```{r}
+GleyfromRiverSoil<-soilloi_clean%>%
+   filter(horizon_type=="Gley")  
+   GleyfromRiverModel<-lm(loi_calc~DistFromRiver, data=GleyfromRiverSoil)
+   autoplot(GleyfromRiverModel)[1:2] + theme_cowplot()
+   anova(GleyfromRiverModel)
+```
+
+# Floodplain1 soils
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Floodplain1")%>%
+  ggplot(aes(x=DistFromRiver, y=loi_calc)) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance from the river (m)",
+       y = "Total Carbon LOI",
+       title = "Influence of distance from the river on Floodplain1 soil samples") +
+  geom_smooth(method = "lm", se=FALSE)+
+  ylim(0,27) +
+  xlim(5,66)+
+  theme_cowplot()  +
+  theme(axis.title.y = element_text(hjust=0.05))+
+  theme(title = element_text(size=11.5))
+```
+
+# linear fit for Floodplain1 soils
+
+```{r}
+WetfromRiverSoil<-soilloi_clean%>%
+   filter(horizon_type=="Floodplain1")  
+   WetfromRiverModel<-lm(loi_calc~DistFromRiver, data=WetfromRiverSoil)
+   autoplot(WetfromRiverModel)[1:2] + theme_cowplot()
+   anova(WetfromRiverModel)
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(wetdrydamp=="Wet")%>%
+  ggplot(aes(x=DistFromRiver, y=loi_calc)) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance from the river (m)",
+       y = "Carbon LOI",
+       title = "Influence of distance from the river on wet soil samples") +
+#  xlim(5,40)+
+  xlim(5,66)+
+  ylim(0,27) +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot()  +
+  theme(title = element_text(size=11.5))
+```
+
+# log fit for wet soils
+
+```{r}
+WetfromRiverSoil<-soilloi_clean%>%
+   filter(wetdrydamp=="Wet")  
+   WetfromRiverModel<-lm(log(loi_calc)~DistFromRiver, data=WetfromRiverSoil)
+   autoplot(WetfromRiverModel)[1:2] + theme_cowplot()
+   anova(WetfromRiverModel)
+```
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  ggplot(aes(x=DistFromRiver, y=loi_calc)) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance from the river (m)",
+       y = "Carbon LOI",
+       title = "Influence of distance from the river on Buried Wetland soil samples") +
+  geom_smooth(method = "lm", se=FALSE)+
+#  ylim(0,10)+
+  ylim(0,27) +
+  xlim(5,66)+
+  theme_cowplot()  +
+  theme(title = element_text(size=11.5))
+```
+
+# log fit for buried wetland soils
+
+```{r}
+WetfromRiverSoil<-soilloi_clean%>%
+   filter(horizon_type=="BuriedWetland")  
+   WetfromRiverModel<-lm(log(loi_calc)~DistFromRiver, data=WetfromRiverSoil)
+   autoplot(WetfromRiverModel)[1:2] + theme_cowplot()
+   anova(WetfromRiverModel)
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="BuriedWetland")%>%
+  filter(wetdrydamp=="Wet")%>%
+  ggplot(aes(x=DistFromRiver, y=loi_calc)) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance from the river (m)",
+       y = "Carbon LOI",
+       title = "Influence of distance from the river on wet Buried Wetland soil samples") +
+  geom_smooth(method = "lm", se=FALSE)+
+#  ylim(0,10)+
+  ylim(0,27) +
+  xlim(5,66)+
+  theme_cowplot()  +
+  theme(title = element_text(size=11.5))
+```
+
+# log fit for wet buried wetland soils
+
+```{r}
+WetfromRiverSoil<-soilloi_clean%>%
+   filter(wetdrydamp=="Wet")%>%
+   filter(horizon_type=="BuriedWetland")  
+   WetfromRiverModel<-lm(log(loi_calc)~DistFromRiver, data=WetfromRiverSoil)
+   autoplot(WetfromRiverModel)[1:2] + theme_cowplot()
+   anova(WetfromRiverModel)
+```
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Wetland")%>%
+  ggplot(aes(x=DistFromRiver, y=loi_calc)) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance from the river (m)",
+       y = "Carbon LOI",
+       title = "Influence of distance from the river on Wetland soil samples") +
+  geom_smooth(method = "lm", se=FALSE)+
+#  ylim(0,10)+
+  ylim(0,27) +
+  xlim(5,66)+
+  theme_cowplot()  +
+  theme(title = element_text(size=11.5))
+```
+
+# log fit for wetland soils
+
+```{r}
+WetfromRiverSoil<-soilloi_clean%>%
+   filter(horizon_type=="Wetland")  
+   WetfromRiverModel<-lm(loi_calc~DistFromRiver, data=WetfromRiverSoil)
+   autoplot(WetfromRiverModel)[1:2] + theme_cowplot()
+   anova(WetfromRiverModel)
+```
+
+# Floodplain2 soils
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Floodplain2")%>%
+  ggplot(aes(x=DistFromRiver, y=loi_calc)) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance from the river (m)",
+       y = "Carbon LOI",
+       title = "Influence of distance from the river on Floodplain2 soil samples") +
+  geom_smooth(method = "lm", se=FALSE)+
+  ylim(0,27) +
+#  ylim(0,10)+
+#  xlim(5,40)+
+  xlim(5,66)+
+  theme_cowplot()  +
+  theme(title = element_text(size=11.5))
+```
+
+# log fit for Floodplain2 soils
+
+```{r}
+WetfromRiverSoil<-soilloi_clean%>%
+   filter(horizon_type=="Floodplain2")  
+   WetfromRiverModel<-lm(loi_calc~DistFromRiver, data=WetfromRiverSoil)
+   autoplot(WetfromRiverModel)[1:2] + theme_cowplot()
+   anova(WetfromRiverModel)
+```
+
+```{r}
+soilloi_clean%>%
+  filter(horizon_type=="Gley")%>%
+  filter(wetdrydamp=="Wet")%>%
+  ggplot(aes(x=DistFromRiver, y=loi_calc)) +
+  geom_point(size=2, alpha=0.5)+
+    labs(x = "Distance from the river (m)",
+       y = "Carbon LOI",
+       title = "Influence of distance from the river on wet gley soil samples") +
+  ylim(0,27) +
+#  ylim(0,10)+
+  xlim(5,66)+
+#  xlim(5,40)+
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot()  +
+  theme(title = element_text(size=11.5))
+```
+
+# log fit for wet Gley soils
+
+```{r}
+WetfromRiverSoil<-soilloi_clean%>%
+   filter(horizon_type=="Gley")%>%
+   filter(wetdrydamp=="Wet")  
+   WetfromRiverModel<-lm(loi_calc~DistFromRiver, data=WetfromRiverSoil)
+   autoplot(WetfromRiverModel)[1:2] + theme_cowplot()
+   anova(WetfromRiverModel)
+```
+

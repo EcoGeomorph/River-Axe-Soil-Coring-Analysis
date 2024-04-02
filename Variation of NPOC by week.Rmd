@@ -1,0 +1,540 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+### MSc Land and Ecological Restoration - Research Project
+# Variation of NPOC by week, soil horizon and soil wetness
+## For Shimadzu, data only available for weeks 1 and 3
+## Wetlands split into BuriedWetlands (including RiverBed) located underneath grey clays
+## and Wetlands for contemporary overlying wetland soils and associated grey clay
+
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+## Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+```
+
+## Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+soil_cores<-read_excel(filepath,
+                       sheet = "SoildataV3",
+                       range = "A1:AE155")
+```
+
+## Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "Wetland", "BuriedWetland")
+PaleoHorizonOrder<-c("Floodplain1", "Gley", "Wetland", "BuriedWetland")
+FldPlnHorizonOrder<-c("Floodplain1", "Floodplain2", "Gley", "BuriedWetland")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+Notice we have some missing values in the loi column, identified by 0 in test_for_loi
+
+```{r}
+soilloi_clean<-soil_cores %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "Gley" | horizon_type == "Wetland" | horizon_type == "BuriedWetland") %>% 
+  select(-fresh_weight) %>%
+  drop_na()
+```
+
+## Summarise the data
+
+```{r}
+horizon_summary<-soilloi_clean %>%
+  group_by(horizon_type) %>%
+  summarise(mean.Snpoc = mean(npoc),
+            se.Snpoc = sd(npoc/sqrt(n())))%>%
+  arrange(HorizonOrder)
+horizon_summary
+```
+
+
+```{r}
+horizon_summary<-soilloi_clean %>%
+  group_by(horizon_type) %>%
+  filter(Week=="Week1")%>%
+  summarise(mean.Snpoc = mean(npoc),
+            se.Snpoc = sd(npoc/sqrt(n())))%>%
+  arrange(HorizonOrder)
+horizon_summary
+```
+
+```{r}
+horizon_summary<-soilloi_clean %>%
+  group_by(horizon_type) %>%
+  filter(Week=="Week3")%>%
+  summarise(mean.Snpoc = mean(npoc),
+            se.Snpoc = sd(npoc/sqrt(n())))
+horizon_summary
+```
+
+
+# Plot the data by soil horizon
+
+```{r}
+soilloi_clean%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax =0.35, ymin = 0, colour=Week)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+  labs(x = "Soil Horizon",
+       y = "NPOC",
+       title = "Variation of NPOC by soil horizon") +
+  ylim(0,115) +
+  theme_cowplot() +
+  theme(legend.position = c(0.01,0.70), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week1")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax =0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour = "#f03b20", alpha=0.5) +
+  labs(x = "Soil Horizon",
+       y = "NPOC",
+       title = "Variation of Week 1 NPOC by soil horizon") +
+  ylim(0,115) +
+  theme_cowplot() 
+```
+
+
+## Test if soil horizon data sets are significantly different in Week 1
+
+```{r}
+Fdpn1npoc<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>% 
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+Fdpn2npoc<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain2") %>% 
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+Gleynpoc<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+Wetlandnpoc<-soilloi_clean %>%
+  filter(horizon_type=="Wetland") %>%
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull()
+
+BuriedWetnpoc<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull()
+
+t.test(Fdpn1npoc,BuriedWetnpoc)
+t.test(Fdpn2npoc,BuriedWetnpoc)
+t.test(Gleynpoc,BuriedWetnpoc)
+t.test(Wetlandnpoc,BuriedWetnpoc)
+
+t.test(Fdpn1npoc,Fdpn2npoc)
+t.test(Fdpn1npoc,Gleynpoc)
+t.test(Gleynpoc, Wetlandnpoc)
+
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week3")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax =0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+  labs(x = "Soil Horizon",
+       y = "NPOC",
+       title = "Variation of Week 3 NPOC by soil horizon") +
+  ylim(0,115) +
+  theme_cowplot() 
+```
+
+## Test if soil horizon data sets are significantly different in Week 3
+
+```{r}
+Fdpn1npoc<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>% 
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+Fdpn2npoc<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain2") %>% 
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+Gleynpoc<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+Wetlandnpoc<-soilloi_clean %>%
+  filter(horizon_type=="Wetland") %>%
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull()
+
+BuriedWetnpoc<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull()
+
+t.test(Fdpn1npoc,BuriedWetnpoc)
+# t.test(Fdpn2npoc,BuriedWetnpoc)
+t.test(Gleynpoc,BuriedWetnpoc)
+# t.test(Wetlandnpoc,BuriedWetnpoc)
+
+# t.test(Fdpn1npoc,Fdpn2npoc)
+t.test(Fdpn1npoc,Gleynpoc)
+# t.test(Gleynpoc, Wetlandnpoc)
+
+```
+
+# Plot the data by soil wetness
+
+```{r}
+soilloi_clean%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=npoc, ymax =0.35, ymin = 0, colour = Week)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+  labs(x = "Soil wetness",
+       y = "NPOC",
+       title = "Variation of NPOC by soil Wetness") +
+  ylim(0,115) +
+  theme_cowplot() +
+  theme(legend.position = c(0.01,0.85), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+## For week 1
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week1")%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=npoc, ymax =0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+  labs(x = "Soil wetness",
+       y = "NPOC",
+       title = "Variation of Week 1 NPOC by soil Wetness") +
+  ylim(0,115) +
+  theme_cowplot() 
+```
+
+## Test if soil wetness data sets are significantly different in Week 1
+
+```{r}
+Wetnpoc<-soilloi_clean %>%
+  filter(wetdrydamp=="Wet") %>% 
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+Dampnpoc<-soilloi_clean %>%
+  filter(wetdrydamp=="Damp") %>% 
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+Drynpoc<-soilloi_clean %>%
+  filter(wetdrydamp=="Dry") %>% 
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+t.test(Wetnpoc, Dampnpoc)
+t.test(Wetnpoc, Drynpoc)
+t.test(Dampnpoc, Drynpoc)
+```
+
+## week 3
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week3")%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=npoc, ymax =0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+  labs(x = "Soil wetness",
+       y = "NPOC",
+       title = "Variation of Week 1 NPOC by soil Wetness") +
+  ylim(0,115) +
+  theme_cowplot() 
+```
+
+## Test if soil wetness data sets are significantly different in Week 3
+
+```{r}
+Wetnpoc<-soilloi_clean %>%
+  filter(wetdrydamp=="Wet") %>% 
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+Dampnpoc<-soilloi_clean %>%
+  filter(wetdrydamp=="Damp") %>% 
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+Drynpoc<-soilloi_clean %>%
+  filter(wetdrydamp=="Dry") %>% 
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+t.test(Wetnpoc, Dampnpoc)
+t.test(Wetnpoc, Drynpoc)
+t.test(Dampnpoc, Drynpoc)
+
+```
+
+
+## For Week 1 for horizon and river
+ 
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week1")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax =0.35, ymin = 0, colour = River)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+  labs(x = "Soil Horizon",
+       y = "npoc",
+       title = "Variation of Week 1 npoc with soil horizon, and river") +
+  theme_cowplot()+
+  ylim(0,115) +
+  theme(legend.position = c(0.1,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10)) 
+```
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week1")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax =0.35, ymin = 0, colour = core_type)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+  labs(x = "Soil Horizon",
+       y = "npoc",
+       title = "Variation of Week1 npoc with soil horizon and core location",
+       colour = "Core location") +
+  theme_cowplot()+
+  ylim(0,115) +
+  theme(legend.position = c(0.1,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10)) 
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week1")%>%
+  filter(core_type=="Paleochannel")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax = 0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+  labs(x = "Soil Horizon",
+       y = "npoc",
+       title = "Week 1 npoc for Paleochannel core soil samples") +
+  ylim(0,115) +
+  theme_cowplot() 
+```
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week1")%>%
+  filter(core_type=="Floodplain")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax = 0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+  labs(x = "Soil Horizon",
+       y = "npoc",
+       title = "Week 1 npoc for Floodplain core soil samples") +
+  ylim(0,115) +
+  theme_cowplot() 
+```
+
+## Test if Week 1 floodplain/ paleochannel soil horizon data sets are significantly different
+
+```{r}
+Fdpn1Floodnpoc<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>%
+  filter(core_type=="Floodplain") %>%  
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+Fdpn1Paleonpoc<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>% 
+  filter(core_type=="Paleochannel") %>%  
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+GleyFloodnpoc<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(core_type=="Floodplain") %>%  
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+GleyPaleonpoc<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(core_type=="Paleochannel") %>%  
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull() 
+
+BuriedWetFloodnpoc<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(core_type=="Floodplain") %>%  
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull()
+
+BuriedWetPaleonpoc<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(core_type=="Paleochannel") %>%  
+  filter(Week=="Week1")%>%
+  select(npoc) %>%
+  pull()
+
+t.test(Fdpn1Floodnpoc, Fdpn1Paleonpoc)
+t.test(GleyFloodnpoc, GleyPaleonpoc)
+t.test(BuriedWetFloodnpoc, BuriedWetPaleonpoc)
+
+```
+
+## For Week 3
+ 
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week3")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax =0.35, ymin = 0, colour = River)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+  labs(x = "Soil Horizon",
+       y = "npoc",
+       title = "Variation of Week 3 npoc with soil horizon, and river") +
+  theme_cowplot()+
+  ylim(0,115) +
+  theme(legend.position = c(0.8,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10)) 
+```
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week3")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax =0.35, ymin = 0, colour = core_type)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+  labs(x = "Soil Horizon",
+       y = "npoc",
+       title = "Variation of Week 3 npoc with soil horizon and core location",
+       colour = "Core location") +
+  theme_cowplot()+
+  ylim(0,115) +
+  theme(legend.position = c(0.8,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10)) 
+```
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week3")%>%
+  filter(core_type=="Paleochannel")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax = 0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+  labs(x = "Soil Horizon",
+       y = "npoc",
+       title = "Week 3 npoc for Paleochannel core soil samples") +
+  ylim(0,115) +
+  theme_cowplot() 
+```
+
+```{r}
+soilloi_clean%>%
+  filter(Week=="Week3")%>%
+  filter(core_type=="Floodplain")%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=npoc, ymax = 0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+  labs(x = "Soil Horizon",
+       y = "npoc",
+       title = "Week 3 npoc for Floodplain core soil samples") +
+  ylim(0,115) +
+  theme_cowplot() 
+```
+
+## Test if Week 3 floodplain/ paleochannel soil horizon data sets are significantly different
+
+```{r}
+Fdpn1Floodnpoc<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>%
+  filter(core_type=="Floodplain") %>%  
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+Fdpn1Paleonpoc<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>% 
+  filter(core_type=="Paleochannel") %>%  
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+GleyFloodnpoc<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(core_type=="Floodplain") %>%  
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+GleyPaleonpoc<-soilloi_clean %>%
+  filter(horizon_type=="Gley") %>% 
+  filter(core_type=="Paleochannel") %>%  
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull() 
+
+BuriedWetFloodnpoc<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(core_type=="Floodplain") %>%  
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull()
+
+BuriedWetPaleonpoc<-soilloi_clean %>%
+  filter(horizon_type=="BuriedWetland") %>%
+  filter(core_type=="Paleochannel") %>%  
+  filter(Week=="Week3")%>%
+  select(npoc) %>%
+  pull()
+
+# t.test(Fdpn1Floodnpoc, Fdpn1Paleonpoc)
+t.test(GleyFloodnpoc, GleyPaleonpoc)
+t.test(BuriedWetFloodnpoc, BuriedWetPaleonpoc)
+
+```

@@ -1,0 +1,378 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+
+### MSc Land and Ecological Restoration - Research Project
+# Validity of sample collection methodology
+## LOI data with Gleys soils spilt, wetlands combined
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+### Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+```
+
+## Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+Soilcores<-read_excel(filepath,
+                       sheet = "rawsoildata",
+                       range = "A1:Z155")
+```
+
+## Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "GleyWithOxides", "GreyClay", "Wetland", "Riverbed")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+## Clean up the data
+
+```{r}
+SoilLOI_clean<-Soilcores %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "GleyWithOxides" | horizon_type == "GreyClay" | horizon_type == "Wetland" | horizon_type == "RiverBed") %>%
+  select(-loi) %>%
+  drop_na()
+```
+
+# Summarise the data
+
+```{r}
+LOI_summary<-SoilLOI_clean %>%
+  group_by(horizon_type) %>%
+  summarise(mean.LOI = mean(loi_calc),
+            se.loi = sd(loi_calc/sqrt(n())))%>%
+  arrange(HorizonOrder)
+LOI_summary
+
+```
+
+# Analysis of Date influence
+
+```{r}
+DateLOI_model<-lm(log(loi_calc)~date,data=SoilLOI_clean)
+autoplot(DateLOI_model)[1:2] + theme_cowplot()
+anova(DateLOI_model)
+```
+
+```{r}
+SoilLOI_clean%>%
+  ggplot(aes(y = loi_calc, x = date)) + 
+  labs (y = "LOI", x = "Date of collection", title = "LOI variance with sample date") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme(plot.title = element_text(size=14,))+
+  theme_cowplot()
+```
+
+## Analysis with respect to the Week of sample collection
+
+### Plot the LOI data
+
+```{r}
+SoilLOI_clean%>%
+  ggplot(aes(x=Week, y=loi_calc, ymin = 0)) +
+  geom_boxplot()+
+ geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+    labs(x = "Soil sampling week",
+       y = "LOI",
+       title = "LOI for all soil samples by week of collection") +
+  theme(plot.title = element_text(size=14,))+
+  theme_cowplot() 
+```
+
+### Test if soil samples from different weeks are significantly different
+
+```{r}
+Week1LOI<-SoilLOI_clean %>%
+  filter(Week=="Week1") %>% 
+  select(loi_calc) %>%
+  pull() 
+Week2LOI<-SoilLOI_clean %>%
+  filter(Week=="Week2") %>% 
+  select(loi_calc) %>%
+  pull() 
+Week3LOI<-SoilLOI_clean %>%
+  filter(Week=="Week3") %>% 
+  select(loi_calc) %>%
+  pull() 
+t.test(Week1LOI,Week3LOI)
+t.test(Week1LOI,Week2LOI)
+t.test(Week2LOI,Week3LOI)
+```
+
+```{r}
+SoilLOI_clean%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymin = 0, colour = Week)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Horizon",
+       y = "LOI",
+       title = "LOI for all samples by soil type and by week of collection") +
+  theme_cowplot()+
+  theme(legend.position = c(0.05,0.85), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(plot.title = element_text(size=14,))+
+  theme(axis.text.x=element_text(size=10))
+```
+
+### Test if gley soil samples from different weeks are significantly different
+
+```{r}
+Week1LOI<-SoilLOI_clean %>%
+  filter(Week=="Week1") %>% 
+  filter(horizon_type=="GleyWithOxides")%>%
+  select(loi_calc) %>%
+  pull() 
+Week2LOI<-SoilLOI_clean %>%
+  filter(horizon_type=="GleyWithOxides")%>%
+  filter(Week=="Week2") %>% 
+  select(loi_calc) %>%
+  pull() 
+Week3LOI<-SoilLOI_clean %>%
+  filter(Week=="Week3") %>% 
+  filter(horizon_type=="GleyWithOxides")%>%
+  select(loi_calc) %>%
+  pull() 
+t.test(Week1LOI,Week3LOI)
+t.test(Week1LOI,Week2LOI)
+t.test(Week2LOI,Week3LOI)
+```
+
+```{r}
+Week1LOI<-SoilLOI_clean %>%
+  filter(Week=="Week1") %>% 
+  filter(horizon_type=="GreyClay")%>%
+  select(loi_calc) %>%
+  pull() 
+Week2LOI<-SoilLOI_clean %>%
+  filter(horizon_type=="GreyClay")%>%
+  filter(Week=="Week2") %>% 
+  select(loi_calc) %>%
+  pull() 
+Week3LOI<-SoilLOI_clean %>%
+  filter(Week=="Week3") %>% 
+  filter(horizon_type=="GreyClay")%>%
+  select(loi_calc) %>%
+  pull() 
+t.test(Week1LOI,Week3LOI)
+t.test(Week1LOI,Week2LOI)
+t.test(Week2LOI,Week3LOI)
+```
+
+
+### Test if wetland soil samples from different weeks are significantly different
+
+```{r}
+Week1LOI<-SoilLOI_clean %>%
+  filter(Week=="Week1") %>% 
+  filter(horizon_type=="Wetland")%>%
+  select(loi_calc) %>%
+  pull() 
+Week2LOI<-SoilLOI_clean %>%
+  filter(Week=="Week2") %>%  
+  filter(horizon_type=="Wetland")%>%
+  select(loi_calc) %>%
+  pull() 
+Week3LOI<-SoilLOI_clean %>%
+  filter(Week=="Week3") %>%  
+  filter(horizon_type=="Wetland")%>%
+  select(loi_calc) %>%
+  pull() 
+t.test(Week1LOI,Week3LOI)
+t.test(Week1LOI,Week2LOI)
+t.test(Week2LOI,Week3LOI)
+```
+
+
+```{r}
+SoilLOI_clean%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=loi_calc, ymin = 0, colour = Week)) +
+  geom_boxplot()+
+   geom_point(position = position_jitterdodge())+
+   labs(x = "Soil wetness",
+       y = "LOI",
+       title = "LOI for all samples by soil wetness and by week of collection")+
+  theme_cowplot()+
+  theme(plot.title = element_text(size=14,))+
+  theme(legend.position = c(0.05,0.85), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+### Test if dry soil samples from different weeks are significantly different
+
+```{r}
+Week1LOI<-SoilLOI_clean %>%
+  filter(Week=="Week1") %>% 
+  filter(wetdrydamp=="Dry")%>%
+  select(loi_calc) %>%
+  pull() 
+Week2LOI<-SoilLOI_clean %>%
+  filter(wetdrydamp=="Dry")%>%
+  filter(Week=="Week2") %>% 
+  select(loi_calc) %>%
+  pull() 
+Week3LOI<-SoilLOI_clean %>%
+  filter(Week=="Week3") %>% 
+  filter(wetdrydamp=="Dry")%>%
+  select(loi_calc) %>%
+  pull() 
+t.test(Week1LOI,Week3LOI)
+t.test(Week1LOI,Week2LOI)
+t.test(Week2LOI,Week3LOI)
+```
+
+
+### Test if Damp soil samples from different weeks are significantly different
+
+```{r}
+Week1LOI<-SoilLOI_clean %>%
+  filter(Week=="Week1") %>% 
+  filter(wetdrydamp=="Damp")%>%
+  select(loi_calc) %>%
+  pull() 
+Week2LOI<-SoilLOI_clean %>%
+  filter(wetdrydamp=="Damp")%>%
+  filter(Week=="Week2") %>% 
+  select(loi_calc) %>%
+  pull() 
+Week3LOI<-SoilLOI_clean %>%
+  filter(Week=="Week3") %>% 
+  filter(wetdrydamp=="Damp")%>%
+  select(loi_calc) %>%
+  pull() 
+t.test(Week1LOI,Week3LOI)
+t.test(Week1LOI,Week2LOI)
+t.test(Week2LOI,Week3LOI)
+```
+
+### Test if Wet soil samples from different weeks are significantly different
+
+```{r}
+Week1LOI<-SoilLOI_clean %>%
+  filter(Week=="Week1") %>% 
+  filter(wetdrydamp=="Wet")%>%
+  select(loi_calc) %>%
+  pull() 
+Week2LOI<-SoilLOI_clean %>%
+  filter(wetdrydamp=="Wet")%>%
+  filter(Week=="Week2") %>% 
+  select(loi_calc) %>%
+  pull() 
+Week3LOI<-SoilLOI_clean %>%
+  filter(Week=="Week3") %>% 
+  filter(wetdrydamp=="Wet")%>%
+  select(loi_calc) %>%
+  pull() 
+t.test(Week1LOI,Week3LOI)
+t.test(Week1LOI,Week2LOI)
+t.test(Week2LOI,Week3LOI)
+```
+
+
+# Analysis with resepct to time to freezing
+
+## Analysis of Date influence
+
+```{r}
+TTFLOI_model<-lm(log(loi_calc)~TimeToFreeze,data=SoilLOI_clean)
+autoplot(TTFLOI_model)[1:2] + theme_cowplot()
+anova(TTFLOI_model)
+```
+
+```{r}
+SoilLOI_clean%>%
+  ggplot(aes(y = loi_calc, x = TimeToFreeze)) + 
+  labs (y = "LOI", x = "Number of days until samples were frozen", title = "LOI variance with sample time till frozen") + # axis labels
+  geom_point(size = 2,alpha=0.5) + 
+  geom_smooth(method="lm",se=FALSE)+
+  theme_cowplot()+
+  theme(plot.title = element_text(size=14,))
+```
+
+
+## Plot the LOI data
+
+```{r}
+SoilLOI_clean%>%
+  ggplot(aes(x=factor(TimeToFreeze), y=loi_calc, ymin = 0, colour = factor(TimeToFreeze))) +
+  geom_boxplot()+
+ geom_jitter(width=0.1, colour = "#f03b20",alpha=0.5) +
+    labs(x = "Number of days until samples were frozen",
+       y = "LOI",
+       title = "LOI for all samples by number of days till frozen",
+       colour = "No.of days") +
+  theme_cowplot()+
+  theme(plot.title = element_text(size=14,))
+```
+
+### Test if soil samples with different times to freezing are significantly different
+
+```{r}
+Day1LOI<-SoilLOI_clean %>%
+  filter(TimeToFreeze==1) %>% 
+  select(loi_calc) %>%
+  pull() 
+Day2LOI<-SoilLOI_clean %>%
+  filter(TimeToFreeze==2) %>% 
+  select(loi_calc) %>%
+  pull() 
+Day3LOI<-SoilLOI_clean %>%
+  filter(TimeToFreeze==3) %>% 
+  select(loi_calc) %>%
+  pull() 
+Day4LOI<-SoilLOI_clean %>%
+  filter(TimeToFreeze==4) %>% 
+  select(loi_calc) %>%
+  pull() 
+t.test(Day1LOI,Day2LOI)
+t.test(Day1LOI,Day3LOI)
+t.test(Day1LOI,Day4LOI)
+t.test(Day2LOI,Day3LOI)
+t.test(Day2LOI,Day4LOI)
+t.test(Day3LOI,Day4LOI)
+```
+
+```{r}
+SoilLOI_clean%>%
+ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymin = 0, colour = factor(TimeToFreeze))) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Horizon",
+       y = "LOI",
+       title = "LOI for all samples by soil type and by number of days till frozen",
+       colour = "Days till Frozen") +
+  theme_cowplot() +
+  theme(plot.title = element_text(size=14,))+
+  theme(legend.position = c(0.05,0.8), legend.title = element_text(size =10), legend.text = element_text(size=10,))+
+  theme(axis.text.x=element_text(size=10))
+```
+
+
+```{r}
+SoilLOI_clean%>%
+  ggplot(aes(x=factor(wetdrydamp,WetnessOrder), y=loi_calc, ymin = 0, colour =factor(TimeToFreeze))) +
+  geom_boxplot()+
+   geom_point(position = position_jitterdodge())+
+   labs(x = "Soil Wetness",
+       y = "LOI",
+       title = "LOI for all samples by soil wetness and by number of days till frozen",
+       colour = "Days till Frozen") +
+  theme_cowplot() +
+  theme(plot.title = element_text(size=14,))+
+  theme(legend.position = c(0.05,0.8), legend.title = element_text(size =10), legend.text = element_text(size=10,))
+```
+

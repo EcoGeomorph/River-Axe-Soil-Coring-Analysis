@@ -1,0 +1,217 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+
+### MSc Land and Ecological Restoration - Research Project
+# Consideration of soil horizon classification
+## LOI data with Gleys soils spilt, wetlands combined, riverbed separate
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+### Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+library(lme4)
+library(lmerTest)
+```
+
+## Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+soil_cores<-read_excel(filepath,
+                       sheet = "rawsoildata",
+                       range = "A1:AB155")
+```
+
+## Set soil horizon layer order
+```{r}
+HorizonOrder<-c("Floodplain1", "Floodplain2", "GleyWithOxides", "GreyClay", "Wetland", "Riverbed")
+PaleoHorizonOrder<-c("Floodplain1", "GleyWithOxides", "GreyClay", "Wetland", "Riverbed")
+FldPlnHorizonOrder<-c("Floodplain1", "Floodplain2", "GleyWithOxides", "GreyClay", "Wetland")
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+Notice we have some missing values in the loi column, identified by 0 in test_for_loi
+
+```{r}
+soilloi_clean<-soil_cores %>%
+  filter(horizon_type == "Floodplain2" | horizon_type == "Floodplain1" | horizon_type == "GleyWithOxides" | horizon_type == "GreyClay" | horizon_type == "Wetland" | horizon_type == "RiverBed") %>%  
+  select(-loi) %>%
+  drop_na()
+```
+
+## split floodplain and paleochannel data
+```{r}
+paleochannel<-soilloi_clean %>%
+  filter(core_type=="Paleochannel")
+floodplain<-soilloi_clean %>%
+  filter(core_type=="Floodplain")
+```
+
+# Summarise the data
+
+```{r}
+horizon_summary<-soilloi_clean %>%
+  group_by(horizon_type) %>%
+  summarise(mean.Sloi = mean(loi_calc),
+            se.Sloi = sd(loi_calc/sqrt(n())))%>%
+  arrange(HorizonOrder)
+horizon_summary
+```
+```{r}
+horizon_summary<-soilloi_clean %>%
+  filter(River=="Axe") %>%
+  group_by(horizon_type) %>%
+  summarise(mean.Sloi = mean(loi_calc),
+            se.Sloi = sd(loi_calc/sqrt(n())))%>%
+  arrange(HorizonOrder)
+horizon_summary
+```
+```{r}
+horizon_summary<-soilloi_clean %>%
+  filter(River=="Synderford")%>%
+  group_by(horizon_type) %>%
+  summarise(mean.Sloi = mean(loi_calc),
+            se.Sloi = sd(loi_calc/sqrt(n())))%>%
+  arrange(PaleoHorizonOrder)
+horizon_summary
+```
+
+```{r}
+PaleoHorizonSummary<-paleochannel%>%
+  group_by(horizon_type) %>%
+  summarise(mean.Sloi = mean(loi_calc),
+            se.Sloi = sd(loi_calc/sqrt(n())))%>%
+  arrange(PaleoHorizonOrder)
+PaleoHorizonSummary
+```
+
+```{r}
+FloodHorizonSummary<-floodplain%>%
+  group_by(horizon_type) %>%
+  summarise(mean.Sloi = mean(loi_calc),
+            se.Sloi = sd(loi_calc/sqrt(n())))%>%
+  arrange(FldPlnHorizonOrder)
+FloodHorizonSummary
+```
+
+
+## Plot the data
+
+```{r}
+soilloi_clean%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymax =0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+    labs(x = "Soil Horizon",
+       y = "Carbon LOI",
+       title = "Variation of LOI with soil horizon") +
+  theme_cowplot() +
+  theme(axis.text.x=element_text(size=10))
+```
+
+```{r}
+soilloi_clean%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymax =0.35, ymin = 0, colour = River)) +
+  geom_boxplot()+
+  geom_point(position = position_jitterdodge())+
+
+    labs(x = "Soil Horizon",
+       y = "Carbon LOI",
+       title = "Variation of LOI with soil horizon and river") +
+  theme_cowplot()+
+  theme(legend.position = c(0.85,0.9), legend.title = element_text(size =12), legend.text = element_text(size=10))+
+  theme(axis.text.x=element_text(size=10))
+```
+
+
+```{r}
+paleochannel%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymax = 0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+#  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Horizon",
+       y = "Carbon LOI",
+       title = "Paleochannel soil samples") +
+  theme_cowplot() +
+  theme(axis.text.x=element_text(size=10))
+```
+
+
+```{r}
+floodplain%>%
+  ggplot(aes(x=reorder(horizon_type,Horizon_order), y=loi_calc, ymax = 0.35, ymin = 0)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+#  geom_point(position = position_jitterdodge())+
+    labs(x = "Soil Horizon",
+       y = "Carbon LOI",
+       title = "Floodplain soil samples") +
+  theme_cowplot() +
+  theme(axis.text.x=element_text(size=10))
+```
+
+
+## Test if soil horizon data sets are significantly different
+
+```{r}
+Fdpn1Loi<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain1") %>% 
+  select(loi_calc) %>%
+  pull() 
+
+Fdpn2Loi<-soilloi_clean %>%
+  filter(horizon_type=="Floodplain2") %>% 
+  select(loi_calc) %>%
+  pull() 
+
+GleyOxideLoi<-soilloi_clean %>%
+  filter(horizon_type=="GleyWithOxides") %>% 
+  select(loi_calc) %>%
+  pull() 
+
+GreyClayLoi<-soilloi_clean %>%
+  filter(horizon_type=="GreyClay") %>%
+  select(loi_calc) %>%
+  pull()
+
+WetlandLoi<-soilloi_clean %>%
+  filter(horizon_type=="Wetland") %>%
+  select(loi_calc) %>%
+  pull()
+
+RiverBedLoi<-soilloi_clean %>%
+  filter(horizon_type=="RiverBed") %>%
+  select(loi_calc) %>%
+  pull()
+
+t.test(Fdpn1Loi,WetlandLoi)
+t.test(Fdpn2Loi,WetlandLoi)
+t.test(GleyOxideLoi,WetlandLoi)
+t.test(GreyClayLoi,WetlandLoi)
+t.test(RiverBedLoi,WetlandLoi)
+
+t.test(Fdpn1Loi,Fdpn2Loi)
+t.test(Fdpn1Loi,GleyOxideLoi)
+t.test(Fdpn1Loi,GreyClayLoi)
+
+t.test(GleyOxideLoi,GreyClayLoi)
+
+```
+

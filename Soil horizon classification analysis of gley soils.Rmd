@@ -1,0 +1,135 @@
+---
+title: "An investigation of the long term ecological and soil carbon storage responses of the Upper Axe valley to landscape scale anthropogenic impacts"
+author: "Julian Payne"
+date: "2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+
+### MSc Land and Ecological Restoration - Research Project
+# Consideration of soil horizon classification
+## detailed analysis of combined gley soils (with gleys in wetlands removed)
+### with reference to sample depth below the surface (depth_cm)
+
+```{r}
+knitr::opts_chunk$set(message=FALSE,warning=FALSE)
+```
+
+### Load packages
+```{r}
+library(tidyverse)
+library(here)
+library(ggfortify)
+library(readxl)
+library(cowplot)
+library(vegan)
+library(lme4)
+library(lmerTest)
+```
+
+## Load the data for the project
+```{r}
+filepath<-here("data","Soil_Cores.xlsx")
+soil_cores<-read_excel(filepath,
+                       sheet = "Soildata",
+                       range = "A1:AB155")
+```
+### Set soil wetness layer order
+```{r}
+WetnessOrder<-c("Dry", "Damp", "Wet")
+```
+
+### Clean up the data
+Notice some missing values in the loi column, identified by 0 in test_for_loi
+
+```{r}
+soilloi_clean<-soil_cores %>%
+  filter( horizon_type == "Floodplain1" |horizon_type == "Floodplain2" | horizon_type == "Gley" | horizon_type == "Wetland" | horizon_type == "RiverBed") %>%  
+  select(-loi) %>%
+  drop_na()
+```
+
+# considering Gley soils in detail
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc)) +
+  geom_point(aes(size=wetdrydamp), alpha=0.5, colour="Blue")+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Gley soil LOI with Depth for the Axe Valley",
+          size = "Soil wetness") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))+
+  theme(legend.position = c(0.83,0.8), legend.title = element_text(size =12), legend.text = element_text(size=10))
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc, colour = factor( wetdrydamp, ordered(WetnessOrder)))) +
+  geom_point(aes(size=core_type), alpha=0.5)+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Gley soil LOI with Depth for the Axe Valley",
+       size = "Core location",
+       colour = "Soil wetness") +
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))+
+  theme(legend.position = c(0.8,0.75), legend.title = element_text(size =10.5), legend.text = element_text(size=10))
+```
+
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  ggplot(aes(x=depth_cm, y=loi_calc, colour = core_type )) +
+  geom_point(aes(size=factor( wetdrydamp, ordered(WetnessOrder))), alpha=0.5)+
+    labs(x = "Depth (cm) below surface",
+       y = "Total Carbon LOI",
+       title = "Variation of Gley soil LOI with Depth for the Axe Valley",
+       size = "Soil wetness",
+       colour = "Core location") +
+  geom_smooth(method = "lm", se=FALSE)+
+  theme_cowplot() +
+  theme(title = element_text(size=10.5))+
+  theme(legend.position = c(0.8,0.75), legend.title = element_text(size =10.5), legend.text = element_text(size=10))
+```
+
+```{r}
+soilloi_clean%>%
+  filter(River=="Axe")%>%
+  filter(horizon_type=="Gley")%>%
+  ggplot(aes(x=core_type, y=loi_calc)) +
+  geom_boxplot()+
+  geom_jitter(width=0.1, colour ="#f03b00" ,alpha=0.5) +
+    labs(x = "Core location",
+       y = "Carbon LOI",
+       title = "Variation of Gley LOI with core location") +
+  theme_cowplot() 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
